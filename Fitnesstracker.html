@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>FormForge — AI Fitness Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=Inter:wght@300;400;600&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --accent: #00ff88;
+    --accent2: #ff3366;
+    --warn: #ffaa00;
+    --text: #e8e8f0;
+    --muted: #5a5a7a;
+    --card: #16161f;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10,10,15,0.95);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 2px;
+    background: linear-gradient(135deg, var(--accent), #00ccff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .logo span { color: var(--accent2); -webkit-text-fill-color: var(--accent2); }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    display: inline-block;
+    margin-right: 6px;
+    transition: background 0.3s;
+  }
+  .status-dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* ── Main Layout ── */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 16px;
+    padding: 16px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  @media (max-width: 860px) {
+    .main { grid-template-columns: 1fr; }
+  }
+
+  /* ── Camera Panel ── */
+  .camera-wrap {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #000;
+    aspect-ratio: 4/3;
+    border: 1px solid var(--border);
+  }
+  #videoEl {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+    transform: scaleX(-1);
+  }
+  #poseCanvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    transform: scaleX(-1);
+  }
+
+  /* camera controls overlay */
+  .cam-overlay {
+    position: absolute;
+    top: 12px; left: 12px;
+    display: flex;
+    gap: 8px;
+    z-index: 10;
+  }
+  .cam-btn {
+    background: rgba(0,0,0,0.7);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    transition: all 0.2s;
+  }
+  .cam-btn:hover, .cam-btn.active {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+  }
+
+  /* Rep counter overlay */
+  .rep-overlay {
+    position: absolute;
+    bottom: 12px; left: 12px;
+    display: flex;
+    gap: 10px;
+  }
+  .rep-badge {
+    background: rgba(0,0,0,0.82);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 14px;
+    text-align: center;
+    backdrop-filter: blur(6px);
+  }
+  .rep-badge .val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 36px;
+    line-height: 1;
+    color: var(--accent);
+  }
+  .rep-badge .lbl {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* form score */
+  .form-score-wrap {
+    position: absolute;
+    top: 12px; right: 12px;
+    background: rgba(0,0,0,0.82);
+    border-radius: 10px;
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    text-align: center;
+    backdrop-filter: blur(6px);
+  }
+  .form-score-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 30px;
+    line-height: 1;
+    color: var(--accent);
+    transition: color 0.3s;
+  }
+  .form-score-val.warn { color: var(--warn); }
+  .form-score-val.bad  { color: var(--accent2); }
+  .form-score-lbl { font-size: 9px; color: var(--muted); font-family:'DM Mono',monospace; letter-spacing:1.5px; text-transform:uppercase; }
+
+  /* ── Sidebar ── */
+  .sidebar { display: flex; flex-direction: column; gap: 12px; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+  }
+  .card-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+
+  /* Exercise selector */
+  .ex-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .ex-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 8px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .ex-btn.active {
+    background: rgba(0,255,136,0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .ex-btn:hover { border-color: var(--accent); }
+  .ex-icon { font-size: 20px; display: block; margin-bottom: 4px; }
+
+  /* Controls */
+  .controls { display: flex; gap: 8px; margin-top: 4px; }
+  .ctrl-btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    letter-spacing: 1.5px;
+    transition: all 0.2s;
+  }
+  .ctrl-btn.start { background: var(--accent); color: #000; }
+  .ctrl-btn.stop  { background: var(--accent2); color: #fff; }
+  .ctrl-btn.reset { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+  .ctrl-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  .ctrl-btn:active { transform: translateY(0); }
+
+  /* AI Coach box */
+  #coachBox {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 12px;
+    min-height: 80px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+    border-left: 3px solid var(--accent);
+    position: relative;
+  }
+  #coachBox.warn { border-left-color: var(--warn); }
+  #coachBox.bad  { border-left-color: var(--accent2); }
+  .coach-typing {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    padding: 4px 0;
+  }
+  .coach-typing span {
+    width: 5px; height: 5px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: bounce 1s infinite;
+  }
+  .coach-typing span:nth-child(2) { animation-delay: 0.2s; }
+  .coach-typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+
+  /* Stats row */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .stat-cell {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 10px 8px;
+    text-align: center;
+    border: 1px solid var(--border);
+  }
+  .stat-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    color: var(--accent);
+  }
+  .stat-lbl {
+    font-size: 9px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* Angle gauge */
+  .angle-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .angle-item { font-size: 11px; color: var(--muted); }
+  .angle-bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 4px;
+    margin-top: 4px;
+    overflow: hidden;
+  }
+  .angle-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 4px;
+    transition: width 0.2s;
+  }
+  .angle-val-txt {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  /* Phase indicator */
+  .phase-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0,255,136,0.08);
+    border: 1px solid rgba(0,255,136,0.2);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    margin-bottom: 8px;
+    transition: all 0.3s;
+  }
+  .phase-pill.down { background: rgba(255,170,0,0.08); border-color: rgba(255,170,0,0.2); color: var(--warn); }
+  .phase-pill.bad { background: rgba(255,51,102,0.08); border-color: rgba(255,51,102,0.2); color: var(--accent2); }
+
+  /* History list */
+  #historyList { max-height: 120px; overflow-y: auto; }
+  .hist-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+  }
+  .hist-item:last-child { border: none; }
+  .hist-score { color: var(--accent); }
+
+  /* Loading screen */
+  #loadScreen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    gap: 16px;
+  }
+  .load-logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 48px;
+    letter-spacing: 4px;
+    background: linear-gradient(135deg, var(--accent), #00ccff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .load-bar {
+    width: 220px; height: 3px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .load-progress {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), #00ccff);
+    border-radius: 3px;
+    width: 0;
+    transition: width 0.4s ease;
+  }
+  .load-status {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  /* Toast */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    z-index: 500;
+    transition: transform 0.3s cubic-bezier(.34,1.56,.64,1);
+    pointer-events: none;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* Rep flash */
+  .rep-flash {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: 16px;
+    border: 3px solid transparent;
+    transition: border-color 0.15s;
+  }
+  .rep-flash.flash { border-color: var(--accent); box-shadow: inset 0 0 30px rgba(0,255,136,0.15); }
+
+  /* Camera facing toggle for Android */
+  .cam-face-btn {
+    background: rgba(0,0,0,0.7);
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s;
+    position: absolute;
+    bottom: 12px; right: 12px;
+    z-index: 10;
+  }
+  .cam-face-btn:hover { background: var(--accent); color: #000; }
+</style>
+</head>
+<body>
+
+<!-- Loading Screen -->
+<div id="loadScreen">
+  <div class="load-logo">FORMFORGE</div>
+  <div style="font-size:13px;color:var(--muted);font-family:'DM Mono',monospace;">AI Powered Fitness Tracker</div>
+  <div class="load-bar"><div class="load-progress" id="loadBar"></div></div>
+  <div class="load-status" id="loadStatus">Loading MediaPipe...</div>
+</div>
+
+<header>
+  <div class="logo">FORM<span>FORGE</span></div>
+  <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-family:'DM Mono',monospace;color:var(--muted)">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusTxt">Initializing</span>
+  </div>
+</header>
+
+<div class="main">
+  <!-- Camera -->
+  <div>
+    <div class="camera-wrap" id="cameraWrap">
+      <video id="videoEl" autoplay muted playsinline></video>
+      <canvas id="poseCanvas"></canvas>
+
+      <div class="rep-flash" id="repFlash"></div>
+
+      <!-- Overlays -->
+      <div class="cam-overlay">
+        <button class="cam-btn active" id="poseToggle" onclick="togglePose()">⬡ POSE ON</button>
+        <button class="cam-btn" onclick="toggleSkeleton()">💀 SKELETON</button>
+      </div>
+
+      <div class="form-score-wrap">
+        <div class="form-score-val" id="formScoreDisp">—</div>
+        <div class="form-score-lbl">Form Score</div>
+      </div>
+
+      <div class="rep-overlay">
+        <div class="rep-badge">
+          <div class="val" id="repCount">0</div>
+          <div class="lbl">Reps</div>
+        </div>
+        <div class="rep-badge">
+          <div class="val" id="setCount">0</div>
+          <div class="lbl">Sets</div>
+        </div>
+        <div class="rep-badge">
+          <div class="val" id="timerDisp">0:00</div>
+          <div class="lbl">Time</div>
+        </div>
+      </div>
+
+      <!-- Camera switch for Android -->
+      <button class="cam-face-btn" onclick="switchCamera()" title="Switch camera">🔄</button>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+
+    <!-- Exercise Picker -->
+    <div class="card">
+      <div class="card-title">Exercise</div>
+      <div class="ex-selector">
+        <button class="ex-btn active" onclick="setExercise('squat',this)">
+          <span class="ex-icon">🦵</span>SQUAT
+        </button>
+        <button class="ex-btn" onclick="setExercise('pushup',this)">
+          <span class="ex-icon">💪</span>PUSH-UP
+        </button>
+        <button class="ex-btn" onclick="setExercise('lunge',this)">
+          <span class="ex-icon">🏃</span>LUNGE
+        </button>
+        <button class="ex-btn" onclick="setExercise('shoulder_press',this)">
+          <span class="ex-icon">🏋</span>SHOULDER
+        </button>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="card">
+      <div class="card-title">Controls</div>
+      <div class="controls">
+        <button class="ctrl-btn start" id="startBtn" onclick="startSession()">START</button>
+        <button class="ctrl-btn stop" id="stopBtn" onclick="stopSession()" style="display:none">STOP</button>
+        <button class="ctrl-btn reset" onclick="resetSession()">RESET</button>
+      </div>
+    </div>
+
+    <!-- AI Coach -->
+    <div class="card">
+      <div class="card-title">🤖 AI Coach</div>
+      <div class="phase-pill" id="phasePill">● WAITING</div>
+      <div id="coachBox">Position yourself in front of the camera and press START to begin your session.</div>
+    </div>
+
+    <!-- Joint Angles -->
+    <div class="card">
+      <div class="card-title">Joint Angles</div>
+      <div class="angle-grid" id="angleGrid">
+        <div class="angle-item">
+          Left Knee
+          <div style="display:flex;justify-content:space-between">
+            <div class="angle-bar" style="flex:1;margin-right:6px"><div class="angle-fill" id="bar-lknee" style="width:0%"></div></div>
+            <span class="angle-val-txt" id="val-lknee">—°</span>
+          </div>
+        </div>
+        <div class="angle-item">
+          Right Knee
+          <div style="display:flex;justify-content:space-between">
+            <div class="angle-bar" style="flex:1;margin-right:6px"><div class="angle-fill" id="bar-rknee" style="width:0%"></div></div>
+            <span class="angle-val-txt" id="val-rknee">—°</span>
+          </div>
+        </div>
+        <div class="angle-item">
+          Left Hip
+          <div style="display:flex;justify-content:space-between">
+            <div class="angle-bar" style="flex:1;margin-right:6px"><div class="angle-fill" id="bar-lhip" style="width:0%"></div></div>
+            <span class="angle-val-txt" id="val-lhip">—°</span>
+          </div>
+        </div>
+        <div class="angle-item">
+          Right Hip
+          <div style="display:flex;justify-content:space-between">
+            <div class="angle-bar" style="flex:1;margin-right:6px"><div class="angle-fill" id="bar-rhip" style="width:0%"></div></div>
+            <span class="angle-val-txt" id="val-rhip">—°</span>
+          </div>
+        </div>
+        <div class="angle-item">
+          Left Elbow
+          <div style="display:flex;justify-content:space-between">
+            <div class="angle-bar" style="flex:1;margin-right:6px"><div class="angle-fill" id="bar-lelbow" style="width:0%"></div></div>
+            <span class="angle-val-txt" id="val-lelbow">—°</span>
+          </div>
+        </div>
+        <div class="angle-item">
+          Right Elbow
+          <div style="display:flex;justify-content:space-between">
+            <div class="angle-bar" style="flex:1;margin-right:6px"><div class="angle-fill" id="bar-relbow" style="width:0%"></div></div>
+            <span class="angle-val-txt" id="val-relbow">—°</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Session Stats -->
+    <div class="card">
+      <div class="card-title">Session Stats</div>
+      <div class="stats-row">
+        <div class="stat-cell">
+          <div class="stat-val" id="avgForm">—</div>
+          <div class="stat-lbl">Avg Form</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-val" id="totalReps">0</div>
+          <div class="stat-lbl">Total Reps</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-val" id="bestForm">—</div>
+          <div class="stat-lbl">Best Rep</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="card">
+      <div class="card-title">Rep History</div>
+      <div id="historyList"><div style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;">No reps yet.</div></div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- MediaPipe -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+<script>
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+const state = {
+  exercise: 'squat',
+  running: false,
+  reps: 0,
+  sets: 0,
+  totalReps: 0,
+  phase: 'up',          // up | down
+  formScores: [],
+  repHistory: [],
+  bestForm: 0,
+  timerStart: null,
+  timerInterval: null,
+  poseEnabled: true,
+  skeletonOn: true,
+  facingUser: true,     // front camera default
+  lastCoachTime: 0,
+  currentFormScore: 0,
+  landmarks: null
+};
+
+// EXERCISE CONFIGS
+const EXERCISES = {
+  squat: {
+    name: 'Squat',
+    downAngle: 90,    // knee angle at bottom
+    upAngle: 160,     // knee angle at top
+    trackJoints: ['lknee','rknee','lhip','rhip'],
+    tips: {
+      depth: 'Go lower — aim for 90° at the knees.',
+      kneeOver: 'Knees caving in! Push them out over your toes.',
+      back: 'Keep your chest up and back straight.',
+      good: 'Perfect depth! Great squat form.',
+      rise: 'Drive through your heels to rise.'
+    }
+  },
+  pushup: {
+    name: 'Push-up',
+    downAngle: 90,
+    upAngle: 155,
+    trackJoints: ['lelbow','relbow','lhip','rhip'],
+    tips: {
+      depth: 'Lower your chest closer to the floor.',
+      back: 'Keep your body in a straight line — hips up!',
+      elbows: 'Tuck elbows slightly — avoid flaring.',
+      good: 'Excellent push-up! Full range of motion.',
+      rise: 'Push explosively through your palms.'
+    }
+  },
+  lunge: {
+    name: 'Lunge',
+    downAngle: 90,
+    upAngle: 155,
+    trackJoints: ['lknee','rknee','lhip','rhip'],
+    tips: {
+      depth: 'Lower your back knee toward the floor.',
+      knee: 'Front knee should stay above your ankle.',
+      balance: 'Engage your core for better balance.',
+      good: 'Great lunge! Full range of motion.',
+      rise: 'Push through the front heel to rise.'
+    }
+  },
+  shoulder_press: {
+    name: 'Shoulder Press',
+    downAngle: 70,
+    upAngle: 155,
+    trackJoints: ['lelbow','relbow','lhip','rhip'],
+    tips: {
+      lockout: 'Fully extend at the top for complete rep.',
+      back: 'Avoid arching your lower back.',
+      control: 'Control the descent — don\'t drop the weight.',
+      good: 'Nice lockout at the top!',
+      rise: 'Press straight up, not forward.'
+    }
+  }
+};
+
+// ═══════════════════════════════════════════
+//  MEDIAPIPE SETUP
+// ═══════════════════════════════════════════
+const videoEl = document.getElementById('videoEl');
+const canvas = document.getElementById('poseCanvas');
+const ctx = canvas.getContext('2d');
+
+let pose, camera;
+
+async function initMediaPipe() {
+  updateLoad(10, 'Loading Pose model...');
+
+  pose = new Pose({
+    locateFile: (file) =>
+      `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+  });
+
+  pose.setOptions({
+    modelComplexity: 1,
+    smoothLandmarks: true,
+    enableSegmentation: false,
+    smoothSegmentation: false,
+    minDetectionConfidence: 0.55,
+    minTrackingConfidence: 0.55
+  });
+
+  pose.onResults(onPoseResults);
+  updateLoad(50, 'Starting camera...');
+  await startCamera();
+}
+
+async function startCamera() {
+  const constraints = {
+    video: {
+      facingMode: state.facingUser ? 'user' : 'environment',
+      width: { ideal: 1280 },
+      height: { ideal: 720 }
+    }
+  };
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    videoEl.srcObject = stream;
+    await videoEl.play();
+
+    // Resize canvas to match video
+    videoEl.addEventListener('loadedmetadata', () => {
+      canvas.width = videoEl.videoWidth;
+      canvas.height = videoEl.videoHeight;
+    });
+
+    camera = new Camera(videoEl, {
+      onFrame: async () => {
+        if (state.poseEnabled) {
+          await pose.send({ image: videoEl });
+        }
+      },
+      width: 1280, height: 720
+    });
+
+    await camera.start();
+    updateLoad(90, 'Almost ready...');
+    setTimeout(() => {
+      updateLoad(100, 'Ready!');
+      setTimeout(hideLoad, 500);
+    }, 400);
+
+    setStatus(true, 'Camera Active');
+  } catch (e) {
+    updateLoad(100, 'Camera error: ' + e.message);
+    setStatus(false, 'Camera Error');
+    showToast('⚠️ Camera access denied. Allow camera permissions.');
+  }
+}
+
+async function switchCamera() {
+  state.facingUser = !state.facingUser;
+  if (videoEl.srcObject) {
+    videoEl.srcObject.getTracks().forEach(t => t.stop());
+  }
+  if (camera) camera.stop();
+  await startCamera();
+  showToast(state.facingUser ? '📷 Front Camera' : '📷 Rear Camera');
+}
+
+// ═══════════════════════════════════════════
+//  POSE RESULTS
+// ═══════════════════════════════════════════
+function onPoseResults(results) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  state.landmarks = results.poseLandmarks;
+
+  if (!results.poseLandmarks) return;
+
+  const lm = results.poseLandmarks;
+
+  // Draw skeleton
+  if (state.skeletonOn) {
+    drawConnectors(ctx, lm, POSE_CONNECTIONS, {
+      color: 'rgba(0,255,136,0.5)', lineWidth: 2
+    });
+    drawLandmarks(ctx, lm, {
+      color: '#00ff88', fillColor: '#003322', lineWidth: 1, radius: 4
+    });
+  }
+
+  // Compute angles
+  const angles = computeAngles(lm);
+  updateAngleUI(angles);
+
+  // Exercise logic
+  if (state.running) {
+    processExercise(lm, angles);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  GEOMETRY
+// ═══════════════════════════════════════════
+function angle3(a, b, c) {
+  const ba = { x: a.x - b.x, y: a.y - b.y };
+  const bc = { x: c.x - b.x, y: c.y - b.y };
+  const dot = ba.x * bc.x + ba.y * bc.y;
+  const mag = Math.sqrt(ba.x**2 + ba.y**2) * Math.sqrt(bc.x**2 + bc.y**2);
+  if (mag === 0) return 180;
+  return Math.round(Math.acos(Math.max(-1, Math.min(1, dot / mag))) * (180 / Math.PI));
+}
+
+function computeAngles(lm) {
+  return {
+    lknee:  angle3(lm[23], lm[25], lm[27]),  // left hip-knee-ankle
+    rknee:  angle3(lm[24], lm[26], lm[28]),  // right
+    lhip:   angle3(lm[11], lm[23], lm[25]),  // shoulder-hip-knee
+    rhip:   angle3(lm[12], lm[24], lm[26]),
+    lelbow: angle3(lm[11], lm[13], lm[15]),  // shoulder-elbow-wrist
+    relbow: angle3(lm[12], lm[14], lm[16]),
+    lshoulder: angle3(lm[13], lm[11], lm[23]),
+    rshoulder: angle3(lm[14], lm[12], lm[24])
+  };
+}
+
+// ═══════════════════════════════════════════
+//  EXERCISE PROCESSING
+// ═══════════════════════════════════════════
+function processExercise(lm, angles) {
+  const cfg = EXERCISES[state.exercise];
+  let primaryAngle, formScore, feedback;
+
+  switch (state.exercise) {
+    case 'squat':
+      primaryAngle = (angles.lknee + angles.rknee) / 2;
+      ({ formScore, feedback } = evalSquat(lm, angles));
+      break;
+    case 'pushup':
+      primaryAngle = (angles.lelbow + angles.relbow) / 2;
+      ({ formScore, feedback } = evalPushup(lm, angles));
+      break;
+    case 'lunge':
+      primaryAngle = Math.min(angles.lknee, angles.rknee);
+      ({ formScore, feedback } = evalLunge(lm, angles));
+      break;
+    case 'shoulder_press':
+      primaryAngle = (angles.lelbow + angles.relbow) / 2;
+      ({ formScore, feedback } = evalShoulderPress(lm, angles));
+      break;
+  }
+
+  state.currentFormScore = formScore;
+  updateFormScore(formScore);
+  updateCoach(feedback, formScore);
+  countReps(primaryAngle, cfg.downAngle, cfg.upAngle, formScore);
+}
+
+// ─── Squat Evaluator ───
+function evalSquat(lm, a) {
+  let score = 100;
+  let feedback = [];
+
+  const kneeAvg = (a.lknee + a.rknee) / 2;
+  const hipAvg = (a.lhip + a.rhip) / 2;
+
+  // Depth
+  if (state.phase === 'down') {
+    if (kneeAvg > 110) { score -= 25; feedback.push(EXERCISES.squat.tips.depth); }
+    else if (kneeAvg <= 95) { score += 5; feedback.push(EXERCISES.squat.tips.good); }
+  }
+
+  // Back straight (shoulder above hip)
+  const shoulderY = (lm[11].y + lm[12].y) / 2;
+  const hipY = (lm[23].y + lm[24].y) / 2;
+  if (shoulderY > hipY + 0.15) { score -= 15; feedback.push(EXERCISES.squat.tips.back); }
+
+  // Knee cave (compare knee x vs hip x)
+  const lKneeX = lm[25].x, lHipX = lm[23].x;
+  const rKneeX = lm[26].x, rHipX = lm[24].x;
+  if (Math.abs(lKneeX - lHipX) < 0.03 || Math.abs(rKneeX - rHipX) < 0.03) {
+    score -= 10; feedback.push(EXERCISES.squat.tips.kneeOver);
+  }
+
+  return { formScore: Math.max(0, Math.min(100, score)), feedback: feedback[0] || '✓ Good form!' };
+}
+
+// ─── Push-up Evaluator ───
+function evalPushup(lm, a) {
+  let score = 100;
+  let feedback = [];
+
+  const elbowAvg = (a.lelbow + a.relbow) / 2;
+
+  if (state.phase === 'down') {
+    if (elbowAvg > 100) { score -= 20; feedback.push(EXERCISES.pushup.tips.depth); }
+  }
+
+  // Body alignment (hip sag/pike)
+  const shoulderY = (lm[11].y + lm[12].y) / 2;
+  const hipY = (lm[23].y + lm[24].y) / 2;
+  const ankleY = (lm[27].y + lm[28].y) / 2;
+
+  const bodyLine = (hipY - shoulderY) / (ankleY - shoulderY);
+  if (bodyLine < 0.35) { score -= 20; feedback.push(EXERCISES.pushup.tips.back); }
+
+  return { formScore: Math.max(0, Math.min(100, score)), feedback: feedback[0] || '✓ Solid push-up!' };
+}
+
+// ─── Lunge Evaluator ───
+function evalLunge(lm, a) {
+  let score = 100;
+  let feedback = [];
+
+  const frontKnee = Math.min(a.lknee, a.rknee);
+  if (state.phase === 'down') {
+    if (frontKnee > 110) { score -= 20; feedback.push(EXERCISES.lunge.tips.depth); }
+  }
+
+  return { formScore: Math.max(0, Math.min(100, score)), feedback: feedback[0] || '✓ Great lunge!' };
+}
+
+// ─── Shoulder Press Evaluator ───
+function evalShoulderPress(lm, a) {
+  let score = 100;
+  let feedback = [];
+
+  const elbowAvg = (a.lelbow + a.relbow) / 2;
+  if (state.phase === 'up' && elbowAvg < 145) { score -= 20; feedback.push(EXERCISES.shoulder_press.tips.lockout); }
+
+  // Lower back arch check
+  const shoulderY = (lm[11].y + lm[12].y) / 2;
+  const hipY = (lm[23].y + lm[24].y) / 2;
+  const hipX = Math.abs(lm[23].x - lm[24].x);
+  if (hipX < 0.05) { score -= 10; feedback.push(EXERCISES.shoulder_press.tips.back); }
+
+  return { formScore: Math.max(0, Math.min(100, score)), feedback: feedback[0] || '✓ Nice press!' };
+}
+
+// ═══════════════════════════════════════════
+//  REP COUNTING
+// ═══════════════════════════════════════════
+function countReps(angle, downThreshold, upThreshold, formScore) {
+  if (state.phase === 'up' && angle < downThreshold + 15) {
+    state.phase = 'down';
+    updatePhase('down');
+  } else if (state.phase === 'down' && angle > upThreshold - 15) {
+    state.phase = 'up';
+    updatePhase('up');
+    completeRep(formScore);
+  }
+}
+
+function completeRep(formScore) {
+  state.reps++;
+  state.totalReps++;
+  state.formScores.push(formScore);
+  if (formScore > state.bestForm) state.bestForm = formScore;
+
+  // Log history
+  const now = new Date().toLocaleTimeString('en', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  state.repHistory.unshift({ rep: state.totalReps, score: formScore, ex: EXERCISES[state.exercise].name, time: now });
+  updateHistory();
+
+  // Update UI
+  document.getElementById('repCount').textContent = state.reps;
+  document.getElementById('totalReps').textContent = state.totalReps;
+
+  const avg = Math.round(state.formScores.reduce((a, b) => a + b, 0) / state.formScores.length);
+  document.getElementById('avgForm').textContent = avg + '%';
+  document.getElementById('bestForm').textContent = state.bestForm + '%';
+
+  // Flash
+  const flash = document.getElementById('repFlash');
+  flash.classList.add('flash');
+  setTimeout(() => flash.classList.remove('flash'), 300);
+
+  // Auto-set every 10 reps
+  if (state.reps >= 10) {
+    state.sets++;
+    state.reps = 0;
+    document.getElementById('setCount').textContent = state.sets;
+    document.getElementById('repCount').textContent = 0;
+    showToast(`🎉 Set ${state.sets} complete! Rest up.`);
+    setCoach(`Set ${state.sets} complete! Great work. Rest 60–90 seconds before the next set.`, 100);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  AI COACH (Anthropic API)
+// ═══════════════════════════════════════════
+let coachCooldown = false;
+
+async function callAICoach(feedback, formScore) {
+  if (coachCooldown) return;
+  coachCooldown = true;
+  setTimeout(() => { coachCooldown = false; }, 8000);  // max once per 8s
+
+  const box = document.getElementById('coachBox');
+  box.innerHTML = '<div class="coach-typing"><span></span><span></span><span></span></div>';
+
+  const cfg = EXERCISES[state.exercise];
+  const avgForm = state.formScores.length
+    ? Math.round(state.formScores.reduce((a,b)=>a+b,0)/state.formScores.length)
+    : formScore;
+
+  const prompt = `You are a professional gym coach giving real-time feedback during a ${cfg.name} workout.
+
+Current data:
+- Exercise: ${cfg.name}
+- Reps completed: ${state.reps}
+- Current form score: ${formScore}%
+- Average form score: ${avgForm}%
+- Phase: ${state.phase} (down = bottom of movement, up = top)
+- Detected issue: "${feedback}"
+
+Give a short (1-2 sentences), encouraging but honest coaching tip. Focus on the most important correction. Be specific. Use casual gym coach language. No emojis. Keep it under 25 words.`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const txt = data.content?.[0]?.text || feedback;
+    setCoach(txt, formScore);
+  } catch (e) {
+    setCoach(feedback, formScore);
+  }
+}
+
+function updateCoach(feedback, formScore) {
+  // Call AI coach every 5 reps or on bad form
+  const shouldCall = (state.reps > 0 && state.reps % 5 === 0) || formScore < 60;
+  if (shouldCall && state.running) {
+    callAICoach(feedback, formScore);
+  } else if (!coachCooldown) {
+    setCoach(feedback, formScore);
+  }
+}
+
+function setCoach(msg, score) {
+  const box = document.getElementById('coachBox');
+  box.textContent = msg;
+  box.className = score >= 75 ? '' : score >= 50 ? 'warn' : 'bad';
+}
+
+// ═══════════════════════════════════════════
+//  UI HELPERS
+// ═══════════════════════════════════════════
+function updateAngleUI(angles) {
+  const joints = { lknee: angles.lknee, rknee: angles.rknee, lhip: angles.lhip, rhip: angles.rhip, lelbow: angles.lelbow, relbow: angles.relbow };
+  for (const [k, v] of Object.entries(joints)) {
+    const bar = document.getElementById(`bar-${k}`);
+    const val = document.getElementById(`val-${k}`);
+    if (bar && val) {
+      bar.style.width = Math.min(100, (v / 180) * 100) + '%';
+      val.textContent = v + '°';
+    }
+  }
+}
+
+function updateFormScore(score) {
+  const el = document.getElementById('formScoreDisp');
+  el.textContent = score + '%';
+  el.className = 'form-score-val' + (score >= 75 ? '' : score >= 50 ? ' warn' : ' bad');
+}
+
+function updatePhase(phase) {
+  const pill = document.getElementById('phasePill');
+  if (phase === 'down') {
+    pill.textContent = '● DESCENDING';
+    pill.className = 'phase-pill down';
+  } else {
+    pill.textContent = '● ASCENDING';
+    pill.className = 'phase-pill';
+  }
+}
+
+function updateHistory() {
+  const list = document.getElementById('historyList');
+  if (!state.repHistory.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted);font-family:\'DM Mono\',monospace;">No reps yet.</div>'; return; }
+  list.innerHTML = state.repHistory.slice(0, 8).map(r =>
+    `<div class="hist-item">
+      <span>#${r.rep} ${r.ex}</span>
+      <span style="color:var(--muted)">${r.time}</span>
+      <span class="hist-score">${r.score}%</span>
+    </div>`
+  ).join('');
+}
+
+// ═══════════════════════════════════════════
+//  SESSION CONTROLS
+// ═══════════════════════════════════════════
+function startSession() {
+  state.running = true;
+  state.phase = 'up';
+  state.timerStart = Date.now();
+  state.timerInterval = setInterval(updateTimer, 1000);
+  document.getElementById('startBtn').style.display = 'none';
+  document.getElementById('stopBtn').style.display = '';
+  updatePhase('up');
+  setCoach(`Let's go! Starting your ${EXERCISES[state.exercise].name} session. Focus on form over speed.`, 100);
+  showToast('▶ Session Started');
+  document.getElementById('statusDot').className = 'status-dot active';
+  document.getElementById('statusTxt').textContent = 'Tracking';
+}
+
+function stopSession() {
+  state.running = false;
+  clearInterval(state.timerInterval);
+  document.getElementById('startBtn').style.display = '';
+  document.getElementById('stopBtn').style.display = 'none';
+  setCoach(`Session paused. ${state.reps} reps, ${state.sets} sets. Good work!`, 85);
+  showToast('⏹ Session Paused');
+  document.getElementById('statusDot').className = 'status-dot active';
+  document.getElementById('statusTxt').textContent = 'Camera Active';
+}
+
+function resetSession() {
+  stopSession();
+  state.reps = 0; state.sets = 0; state.totalReps = 0;
+  state.formScores = []; state.repHistory = []; state.bestForm = 0;
+  document.getElementById('repCount').textContent = 0;
+  document.getElementById('setCount').textContent = 0;
+  document.getElementById('timerDisp').textContent = '0:00';
+  document.getElementById('totalReps').textContent = 0;
+  document.getElementById('avgForm').textContent = '—';
+  document.getElementById('bestForm').textContent = '—';
+  document.getElementById('formScoreDisp').textContent = '—';
+  document.getElementById('phasePill').textContent = '● WAITING';
+  document.getElementById('phasePill').className = 'phase-pill';
+  updateHistory();
+  setCoach('Session reset. Press START when you\'re ready.', 100);
+  showToast('↺ Session Reset');
+}
+
+function updateTimer() {
+  const elapsed = Math.floor((Date.now() - state.timerStart) / 1000);
+  const m = Math.floor(elapsed / 60), s = elapsed % 60;
+  document.getElementById('timerDisp').textContent = `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function setExercise(ex, btn) {
+  state.exercise = ex;
+  document.querySelectorAll('.ex-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (state.running) stopSession();
+  state.phase = 'up';
+  setCoach(`Switching to ${EXERCISES[ex].name}. Get into position and press START.`, 100);
+  showToast(`Exercise: ${EXERCISES[ex].name}`);
+}
+
+function togglePose() {
+  state.poseEnabled = !state.poseEnabled;
+  const btn = document.getElementById('poseToggle');
+  btn.textContent = state.poseEnabled ? '⬡ POSE ON' : '⬡ POSE OFF';
+  btn.classList.toggle('active', state.poseEnabled);
+}
+
+function toggleSkeleton() {
+  state.skeletonOn = !state.skeletonOn;
+}
+
+// ═══════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function setStatus(ok, txt) {
+  document.getElementById('statusDot').className = 'status-dot' + (ok ? ' active' : '');
+  document.getElementById('statusTxt').textContent = txt;
+}
+
+function updateLoad(pct, msg) {
+  document.getElementById('loadBar').style.width = pct + '%';
+  document.getElementById('loadStatus').textContent = msg;
+}
+
+function hideLoad() {
+  const s = document.getElementById('loadScreen');
+  s.style.transition = 'opacity 0.6s';
+  s.style.opacity = '0';
+  setTimeout(() => s.remove(), 600);
+}
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+window.addEventListener('load', () => {
+  // Small delay for fonts
+  setTimeout(initMediaPipe, 300);
+});
+</script>
+</body>
+</html>
